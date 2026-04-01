@@ -20,4 +20,3 @@ Authenticated access using username and password, with a clear logout path so se
 5. Implement logout: clear client state and revoke or expire server-side session.
 6. Protect relation-page and person APIs so only the logged-in user accesses their data.
 7. Add minimal tests for happy path login, wrong password, and logout invalidation.
-8. Create simple UI for login/logot page

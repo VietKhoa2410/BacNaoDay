@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BacNaoDay</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top-bar">
+      <span class="logo">BacNaoDay</span>
+      <span id="header-user" class="header-user hidden"></span>
+      <button type="button" id="btn-logout" class="btn secondary hidden">Log out</button>
+    </header>
+
+    <main class="main">
+      <section id="view-login" class="panel">
+        <h1>Sign in</h1>
+        <p class="muted">Use your account to manage relation pages.</p>
+        <form id="form-login" class="stack">
+          <label>
+            Username
+            <input name="username" type="text" autocomplete="username" required />
+          </label>
+          <label>
+            Password
+            <input name="password" type="password" autocomplete="current-password" required />
+          </label>
+          <p id="login-error" class="error hidden" role="alert"></p>
+          <button type="submit" class="btn primary">Sign in</button>
+        </form>
+      </section>
+
+      <section id="view-dashboard" class="panel hidden">
+        <h1>Your relation pages</h1>
+        <p class="muted">Create a named workspace for each family tree or scenario.</p>
+
+        <form id="form-create-page" class="inline-form">
+          <label class="sr-only" for="input-page-name">Page name</label>
+          <input
+            id="input-page-name"
+            name="name"
+            type="text"
+            maxlength="200"
+            placeholder="New page name"
+            required
+          />
+          <button type="submit" class="btn primary">Create page</button>
+        </form>
+        <p id="create-page-error" class="error hidden" role="alert"></p>
+
+        <ul id="page-list" class="page-list"></ul>
+        <p id="page-list-empty" class="muted hidden">No pages yet. Create one above.</p>
+        <p id="dashboard-error" class="error hidden" role="alert"></p>
+      </section>
+
+      <section id="view-page" class="panel hidden">
+        <nav class="breadcrumb">
+          <a href="#/">← All pages</a>
+        </nav>
+        <h1 id="page-title"></h1>
+        <p id="page-meta" class="muted"></p>
+        <div class="page-detail-section">
+          <h2>People on this page</h2>
+          <p class="muted small">Person nodes from your data (read-only here).</p>
+          <ul id="person-list" class="person-list"></ul>
+          <p id="person-list-empty" class="muted hidden">No people yet.</p>
+        </div>
+        <p id="page-error" class="error hidden" role="alert"></p>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
