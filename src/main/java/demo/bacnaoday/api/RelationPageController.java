@@ -1,6 +1,7 @@
 package demo.bacnaoday.api;
 
 import demo.bacnaoday.api.payload.CreateRelationPageRequest;
+import demo.bacnaoday.api.payload.MarkedPersonRequest;
 import demo.bacnaoday.api.payload.RelationPageResponse;
 import demo.bacnaoday.security.AppUserDetails;
 import demo.bacnaoday.service.RelationPageService;
@@ -10,6 +11,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,5 +45,16 @@ public class RelationPageController {
     @GetMapping("/{id}")
     public RelationPageResponse getOne(@AuthenticationPrincipal AppUserDetails user, @PathVariable Long id) {
         return relationPageService.getOwnedOrNotFound(user, id);
+    }
+
+    @PutMapping("/{id}/marked-person")
+    public RelationPageResponse setMarkedPerson(
+            @AuthenticationPrincipal AppUserDetails user,
+            @PathVariable Long id,
+            @RequestBody MarkedPersonRequest body) {
+        if (body == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "body is required");
+        }
+        return relationPageService.setMarkedPerson(user, id, body.personId());
     }
 }

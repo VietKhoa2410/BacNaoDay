@@ -8,4 +8,6 @@ import java.util.List;
 public interface PersonRepository extends JpaRepository<Person, Long> {
 
     List<Person> findByRelationPage_IdOrderByIdAsc(Long relationPageId);
+
+    boolean existsByIdAndRelationPage_Id(Long id, Long relationPageId);
 }

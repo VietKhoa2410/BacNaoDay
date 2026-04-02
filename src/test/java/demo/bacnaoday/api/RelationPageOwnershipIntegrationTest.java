@@ -20,9 +20,11 @@ import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -227,5 +229,131 @@ class RelationPageOwnershipIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nodes", hasSize(2)))
                 .andExpect(jsonPath("$.edges.length()").value(greaterThanOrEqualTo(1)));
+    }
+
+    @Test
+    void ownerCanSetMarkedPerson_andItAppearsOnGet() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult create = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Tree\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageId = readPageId(create);
+
+        MvcResult personRes = mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Me\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long personId = readPageId(personRes);
+
+        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"personId\":" + personId + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedPersonId").value((int) personId));
+
+        mockMvc.perform(get("/api/relation-pages/" + pageId).headers(bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedPersonId").value((int) personId));
+    }
+
+    @Test
+    void setMarkedPerson_foreignPersonId_returns400() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult p1 = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"A\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageA = readPageId(p1);
+
+        MvcResult p2 = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"B\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageB = readPageId(p2);
+
+        MvcResult personOnB = mockMvc.perform(post("/api/relation-pages/" + pageB + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Only on B\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long foreignPersonId = readPageId(personOnB);
+
+        mockMvc.perform(put("/api/relation-pages/" + pageA + "/marked-person")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"personId\":" + foreignPersonId + "}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void setMarkedPerson_onOthersPage_returns404() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult create = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Alice tree\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageId = readPageId(create);
+
+        MvcResult personRes = mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"P\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long personId = readPageId(personRes);
+
+        String bob = loginAs("bob", "bobpw");
+        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+                        .headers(bearer(bob))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"personId\":" + personId + "}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void setMarkedPerson_nullClearsMarker() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult create = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Tree\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageId = readPageId(create);
+
+        MvcResult personRes = mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Me\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long personId = readPageId(personRes);
+
+        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"personId\":" + personId + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedPersonId").value((int) personId));
+
+        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"personId\":null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedPersonId").value(nullValue()));
     }
 }

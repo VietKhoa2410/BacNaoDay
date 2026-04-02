@@ -2,6 +2,7 @@ package demo.bacnaoday.service;
 
 import demo.bacnaoday.api.payload.RelationPageResponse;
 import demo.bacnaoday.model.RelationPage;
+import demo.bacnaoday.repository.PersonRepository;
 import demo.bacnaoday.repository.RelationPageRepository;
 import demo.bacnaoday.repository.UserRepository;
 import demo.bacnaoday.security.AppUserDetails;
@@ -19,10 +20,15 @@ public class RelationPageService {
 
     private final RelationPageRepository relationPageRepository;
     private final UserRepository userRepository;
+    private final PersonRepository personRepository;
 
-    public RelationPageService(RelationPageRepository relationPageRepository, UserRepository userRepository) {
+    public RelationPageService(
+            RelationPageRepository relationPageRepository,
+            UserRepository userRepository,
+            PersonRepository personRepository) {
         this.relationPageRepository = relationPageRepository;
         this.userRepository = userRepository;
+        this.personRepository = personRepository;
     }
 
     @Transactional(readOnly = true)
@@ -71,7 +77,24 @@ public class RelationPageService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
     }
 
+    @Transactional
+    public RelationPageResponse setMarkedPerson(AppUserDetails user, Long pageId, Long personId) {
+        RelationPage page = requireOwnedPage(user, pageId);
+        if (personId == null) {
+            page.setMarkedPerson(null);
+        } else {
+            if (!personRepository.existsByIdAndRelationPage_Id(personId, pageId)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "personId does not belong to this relation page");
+            }
+            page.setMarkedPerson(personRepository.getReferenceById(personId));
+        }
+        page.setUpdatedAt(Instant.now());
+        return toResponse(relationPageRepository.save(page));
+    }
+
     private RelationPageResponse toResponse(RelationPage page) {
-        return new RelationPageResponse(page.getId(), page.getName(), page.getCreatedAt());
+        Long markedId = page.getMarkedPerson() == null ? null : page.getMarkedPerson().getId();
+        return new RelationPageResponse(page.getId(), page.getName(), page.getCreatedAt(), markedId);
     }
 }

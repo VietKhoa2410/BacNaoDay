@@ -11,6 +11,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
@@ -41,4 +43,9 @@ public class RelationPage {
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "marked_person_id")
+    @OnDelete(action = OnDeleteAction.SET_NULL)
+    private Person markedPerson;
 }
