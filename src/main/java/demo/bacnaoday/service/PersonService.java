@@ -16,8 +16,12 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class PersonService {
@@ -46,10 +50,7 @@ public class PersonService {
     @Transactional(readOnly = true)
     public PersonGraphResponse graphForPage(AppUserDetails user, Long pageId) {
         relationPageService.requireOwnedPage(user, pageId);
-        List<PersonGraphNodeResponse> nodes =
-                personRepository.findByRelationPage_IdOrderByIdAsc(pageId).stream()
-                        .map(p -> new PersonGraphNodeResponse(p.getId(), p.getDisplayName()))
-                        .toList();
+        List<Person> people = personRepository.findByRelationPage_IdOrderByIdAsc(pageId);
         List<PersonGraphEdgeResponse> edges =
                 personRelationService.listForRelationPage(pageId).stream()
                         .map(
@@ -58,6 +59,16 @@ public class PersonService {
                                                 pr.getFromPerson().getId(),
                                                 pr.getToPerson().getId(),
                                                 pr.getRelationType()))
+                        .toList();
+        Set<Long> idSet = people.stream().map(Person::getId).collect(Collectors.toCollection(HashSet::new));
+        Map<Long, Person> byId = people.stream().collect(Collectors.toMap(Person::getId, p -> p));
+        List<Long> order = PersonGraphTopology.orderPersonIdsByFamilyAbove(idSet, edges);
+        List<PersonGraphNodeResponse> nodes =
+                order.stream()
+                        .map(id -> {
+                            Person p = byId.get(id);
+                            return new PersonGraphNodeResponse(p.getId(), p.getDisplayName());
+                        })
                         .toList();
         return new PersonGraphResponse(nodes, edges);
     }

@@ -91,6 +91,99 @@
     return out;
   }
 
+  /**
+   * Layered tree-style layout: ancestors above descendants; spouses/siblings share a row;
+   * multiple people on the same generation are spread horizontally.
+   */
+  function layoutRelationGraphLayers(nodes, allEdges, w, h, pad) {
+    const ids = new Set(nodes.map((n) => n.id));
+    const rank = new Map();
+    for (const n of nodes) {
+      rank.set(n.id, 0);
+    }
+
+    const parentChild = [];
+    const sameGeneration = [];
+    for (const e of allEdges) {
+      const a = e.fromPersonId;
+      const b = e.toPersonId;
+      if (!ids.has(a) || !ids.has(b)) continue;
+      const t = e.relationType;
+      if (t === "FATHER_OF" || t === "MOTHER_OF" || t === "PARENT_OF") {
+        parentChild.push([a, b]);
+      } else if (t === "SON_OF" || t === "DAUGHTER_OF" || t === "CHILD_OF") {
+        parentChild.push([b, a]);
+      } else if (t === "SPOUSE_OF" || t === "SIBLING_OF") {
+        sameGeneration.push([a, b]);
+      }
+    }
+
+    const relaxSteps = Math.max(nodes.length, 1);
+    for (let s = 0; s < relaxSteps; s++) {
+      for (const [p, c] of parentChild) {
+        const next = rank.get(p) + 1;
+        if (next > rank.get(c)) {
+          rank.set(c, next);
+        }
+      }
+    }
+
+    let merged = true;
+    let guard = 0;
+    while (merged && guard < relaxSteps * 2) {
+      merged = false;
+      guard++;
+      for (const [a, b] of sameGeneration) {
+        const m = Math.max(rank.get(a), rank.get(b));
+        if (rank.get(a) !== m || rank.get(b) !== m) {
+          rank.set(a, m);
+          rank.set(b, m);
+          merged = true;
+        }
+      }
+    }
+
+    let maxR = 0;
+    for (const n of nodes) {
+      const r = rank.get(n.id);
+      if (r > maxR) maxR = r;
+    }
+
+    const layers = new Map();
+    for (const n of nodes) {
+      const r = rank.get(n.id);
+      if (!layers.has(r)) {
+        layers.set(r, []);
+      }
+      layers.get(r).push(n);
+    }
+    for (const list of layers.values()) {
+      list.sort((a, b) => a.id - b.id);
+    }
+
+    const innerW = w - 2 * pad;
+    const innerH = h - 2 * pad;
+    const rowCount = maxR + 1;
+    const rowGap =
+      rowCount <= 1 ? 0 : Math.min(96, innerH / Math.max(rowCount - 1, 1));
+    const yBase = pad + (innerH - (rowCount - 1) * rowGap) / 2;
+
+    const positions = new Map();
+    for (let r = 0; r <= maxR; r++) {
+      const row = layers.get(r) || [];
+      const count = row.length;
+      const colGap =
+        count <= 1 ? 0 : Math.min(160, innerW / Math.max(count - 1, 1));
+      const rowSpan = count <= 1 ? 0 : (count - 1) * colGap;
+      const x0 = w / 2 - rowSpan / 2;
+      const y = yBase + r * rowGap;
+      row.forEach((node, i) => {
+        positions.set(node.id, { x: x0 + i * colGap, y });
+      });
+    }
+    return positions;
+  }
+
   function renderPersonGraph(container, graph) {
     container.replaceChildren();
     const nodes = graph.nodes || [];
@@ -131,18 +224,7 @@
     defs.appendChild(marker);
     svg.appendChild(defs);
 
-    const cx = w / 2;
-    const cy = h / 2;
-    const radius = Math.min(w, h) / 2 - pad;
-    const positions = new Map();
-    const n = nodes.length;
-    nodes.forEach((node, i) => {
-      const angle = (2 * Math.PI * i) / n - Math.PI / 2;
-      positions.set(node.id, {
-        x: cx + radius * Math.cos(angle),
-        y: cy + radius * Math.sin(angle),
-      });
-    });
+    const positions = layoutRelationGraphLayers(nodes, graph.edges || [], w, h, pad);
 
     const edgeLabels = [];
     for (const e of edges) {
