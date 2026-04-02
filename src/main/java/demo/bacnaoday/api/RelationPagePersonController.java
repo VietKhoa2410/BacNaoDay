@@ -40,6 +40,6 @@ public class RelationPagePersonController {
         if (body == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "body is required");
         }
-        return personService.create(user, pageId, body.displayName(), body.sortOrder());
+        return personService.create(user, pageId, body);
     }
 }

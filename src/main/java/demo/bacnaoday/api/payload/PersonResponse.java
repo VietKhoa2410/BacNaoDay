@@ -1,3 +1,5 @@
 package demo.bacnaoday.api.payload;
 
-public record PersonResponse(Long id, String displayName, Integer sortOrder) {}
+import demo.bacnaoday.model.PersonRelationType;
+
+public record PersonResponse(Long id, String displayName, PersonRelationType relationType, String toPerson) {}

@@ -2,6 +2,8 @@ package demo.bacnaoday.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -30,15 +32,19 @@ public class Person {
     @JoinColumn(name = "relation_page_id", nullable = false)
     private RelationPage relationPage;
 
-    @Column(name = "display_name", nullable = false, length = 200)
+    @Column(name = "display_name", nullable = false, columnDefinition = "TEXT")
     private String displayName;
 
-    @Column(name = "sort_order")
-    private Integer sortOrder;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "gender", nullable = false, length = 20)
+    private Gender gender = Gender.UNKNOWN;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
 }

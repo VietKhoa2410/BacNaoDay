@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface PersonRepository extends JpaRepository<Person, Long> {
 
-    List<Person> findByRelationPage_IdOrderBySortOrderAscIdAsc(Long relationPageId);
+    List<Person> findByRelationPage_IdOrderByIdAsc(Long relationPageId);
 }
