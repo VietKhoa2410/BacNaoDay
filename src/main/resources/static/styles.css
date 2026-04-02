@@ -62,6 +62,10 @@ body {
   padding: 1.5rem 1rem 3rem;
 }
 
+.main.main--wide {
+  max-width: 52rem;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -220,21 +224,56 @@ input[type="password"] {
   text-decoration: underline;
 }
 
-.person-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.person-list li {
-  padding: 0.4rem 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.person-list li:last-child {
-  border-bottom: none;
-}
-
 .page-detail-section {
   margin-top: 0.5rem;
+}
+
+.person-graph-host {
+  margin-top: 0.5rem;
+  min-height: 5rem;
+}
+
+.relation-graph {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.relation-graph-svg {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  height: auto;
+}
+
+.relation-graph-edge {
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+.relation-graph-arrowhead {
+  fill: var(--muted);
+}
+
+.relation-graph-edge-label {
+  font-size: 10px;
+  fill: var(--muted);
+  pointer-events: none;
+}
+
+.relation-graph-node-circle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.relation-graph-node-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+.relation-graph-empty {
+  margin: 0;
 }

@@ -1,5 +1,6 @@
 package demo.bacnaoday.api;
 
+import demo.bacnaoday.repository.PersonRelationRepository;
 import demo.bacnaoday.repository.PersonRepository;
 import demo.bacnaoday.repository.RelationPageRepository;
 import demo.bacnaoday.repository.UserRepository;
@@ -17,6 +18,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.nio.charset.StandardCharsets;
 
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -38,6 +40,9 @@ class RelationPageOwnershipIntegrationTest {
 
     @Autowired
     PersonRepository personRepository;
+
+    @Autowired
+    PersonRelationRepository personRelationRepository;
 
     @Autowired
     UserCredentialService userCredentialService;
@@ -64,6 +69,7 @@ class RelationPageOwnershipIntegrationTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.webAppContextSetup(webApplicationContext).apply(springSecurity()).build();
+        personRelationRepository.deleteAll();
         personRepository.deleteAll();
         relationPageRepository.deleteAll();
         userRepository.deleteAll();
@@ -171,5 +177,55 @@ class RelationPageOwnershipIntegrationTest {
         String bob = loginAs("bob", "bobpw");
         mockMvc.perform(get("/api/relation-pages/" + pageId + "/persons").headers(bearer(bob)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getPersonGraph_onOthersPage_returns404() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult create = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Private tree\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageId = readPageId(create);
+
+        String bob = loginAs("bob", "bobpw");
+        mockMvc.perform(get("/api/relation-pages/" + pageId + "/persons/graph").headers(bearer(bob)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void ownerGetsPersonGraph_withNodesAndEdges() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult create = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Family\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageId = readPageId(create);
+
+        MvcResult childRes = mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Child\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long childId = readPageId(childRes);
+
+        mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                "{\"displayName\":\"Father\",\"toPersonId\":"
+                                        + childId
+                                        + ",\"relationType\":\"FATHER_OF\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/relation-pages/" + pageId + "/persons/graph").headers(bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes", hasSize(2)))
+                .andExpect(jsonPath("$.edges.length()").value(greaterThanOrEqualTo(1)));
     }
 }

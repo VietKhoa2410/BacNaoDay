@@ -1,6 +1,7 @@
 package demo.bacnaoday.api;
 
 import demo.bacnaoday.api.payload.CreatePersonRequest;
+import demo.bacnaoday.api.payload.PersonGraphResponse;
 import demo.bacnaoday.api.payload.PersonResponse;
 import demo.bacnaoday.security.AppUserDetails;
 import demo.bacnaoday.service.PersonService;
@@ -29,6 +30,12 @@ public class RelationPagePersonController {
     public List<PersonResponse> list(
             @AuthenticationPrincipal AppUserDetails user, @PathVariable Long pageId) {
         return personService.listForPage(user, pageId);
+    }
+
+    @GetMapping("/graph")
+    public PersonGraphResponse graph(
+            @AuthenticationPrincipal AppUserDetails user, @PathVariable Long pageId) {
+        return personService.graphForPage(user, pageId);
     }
 
     @PostMapping

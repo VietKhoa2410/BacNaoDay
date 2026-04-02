@@ -1,6 +1,9 @@
 package demo.bacnaoday.service;
 
 import demo.bacnaoday.api.payload.CreatePersonRequest;
+import demo.bacnaoday.api.payload.PersonGraphEdgeResponse;
+import demo.bacnaoday.api.payload.PersonGraphNodeResponse;
+import demo.bacnaoday.api.payload.PersonGraphResponse;
 import demo.bacnaoday.api.payload.PersonResponse;
 import demo.bacnaoday.model.Person;
 import demo.bacnaoday.model.PersonRelationType;
@@ -38,6 +41,25 @@ public class PersonService {
         return personRepository.findByRelationPage_IdOrderByIdAsc(pageId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PersonGraphResponse graphForPage(AppUserDetails user, Long pageId) {
+        relationPageService.requireOwnedPage(user, pageId);
+        List<PersonGraphNodeResponse> nodes =
+                personRepository.findByRelationPage_IdOrderByIdAsc(pageId).stream()
+                        .map(p -> new PersonGraphNodeResponse(p.getId(), p.getDisplayName()))
+                        .toList();
+        List<PersonGraphEdgeResponse> edges =
+                personRelationService.listForRelationPage(pageId).stream()
+                        .map(
+                                pr ->
+                                        new PersonGraphEdgeResponse(
+                                                pr.getFromPerson().getId(),
+                                                pr.getToPerson().getId(),
+                                                pr.getRelationType()))
+                        .toList();
+        return new PersonGraphResponse(nodes, edges);
     }
 
     @Transactional

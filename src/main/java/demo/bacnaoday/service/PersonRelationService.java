@@ -10,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
+
 @Service
 public class PersonRelationService {
 
@@ -61,6 +63,11 @@ public class PersonRelationService {
 
         personRelationRepository.save(forward);
         personRelationRepository.save(backward);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PersonRelation> listForRelationPage(Long pageId) {
+        return personRelationRepository.findByFromPerson_RelationPage_IdOrderByIdAsc(pageId);
     }
 
     private Person requireActivePerson(Long id) {

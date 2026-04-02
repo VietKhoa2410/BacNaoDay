@@ -58,12 +58,145 @@
   function showView(name) {
     Object.values(views).forEach((el) => el.classList.add("hidden"));
     views[name].classList.remove("hidden");
+    const mainEl = document.querySelector("main.main");
+    if (mainEl) mainEl.classList.toggle("main--wide", name === "page");
     const loggedIn = name !== "login";
     $("header-user").classList.toggle("hidden", !loggedIn);
     $("btn-logout").classList.toggle("hidden", !loggedIn);
     if (loggedIn) {
       $("header-user").textContent = sessionStorage.getItem(USERNAME_KEY) || "";
     }
+  }
+
+  function formatRelationType(t) {
+    if (!t) return "";
+    return t
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  /** At most one edge per unordered pair of people (hides inverse / second directed row). */
+  function dedupeOneEdgePerNodePair(edges) {
+    const seen = new Set();
+    const out = [];
+    for (const e of edges) {
+      const a = Math.min(e.fromPersonId, e.toPersonId);
+      const b = Math.max(e.fromPersonId, e.toPersonId);
+      const key = a + "|" + b;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(e);
+    }
+    return out;
+  }
+
+  function renderPersonGraph(container, graph) {
+    container.replaceChildren();
+    const nodes = graph.nodes || [];
+    const edges = dedupeOneEdgePerNodePair(graph.edges || []);
+    if (!nodes.length) {
+      const empty = document.createElement("p");
+      empty.className = "muted relation-graph-empty";
+      empty.textContent = "No people yet.";
+      container.appendChild(empty);
+      return;
+    }
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const wrap = document.createElement("div");
+    wrap.className = "relation-graph";
+
+    const svg = document.createElementNS(svgNS, "svg");
+    const w = 640;
+    const h = 420;
+    const pad = 80;
+    svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+    svg.setAttribute("class", "relation-graph-svg");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "People and relations on this page");
+
+    const defs = document.createElementNS(svgNS, "defs");
+    const marker = document.createElementNS(svgNS, "marker");
+    marker.setAttribute("id", "relation-graph-arrow");
+    marker.setAttribute("markerWidth", "10");
+    marker.setAttribute("markerHeight", "7");
+    marker.setAttribute("refX", "9");
+    marker.setAttribute("refY", "3.5");
+    marker.setAttribute("orient", "auto");
+    const poly = document.createElementNS(svgNS, "polygon");
+    poly.setAttribute("points", "0 0, 10 3.5, 0 7");
+    poly.setAttribute("class", "relation-graph-arrowhead");
+    marker.appendChild(poly);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const radius = Math.min(w, h) / 2 - pad;
+    const positions = new Map();
+    const n = nodes.length;
+    nodes.forEach((node, i) => {
+      const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+      positions.set(node.id, {
+        x: cx + radius * Math.cos(angle),
+        y: cy + radius * Math.sin(angle),
+      });
+    });
+
+    const edgeLabels = [];
+    for (const e of edges) {
+      const from = positions.get(e.fromPersonId);
+      const to = positions.get(e.toPersonId);
+      if (!from || !to) continue;
+      const line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", from.x);
+      line.setAttribute("y1", from.y);
+      line.setAttribute("x2", to.x);
+      line.setAttribute("y2", to.y);
+      line.setAttribute("class", "relation-graph-edge");
+      line.setAttribute("marker-end", "url(#relation-graph-arrow)");
+      svg.appendChild(line);
+
+      const mx = (from.x + to.x) / 2;
+      const my = (from.y + to.y) / 2;
+      const label = document.createElementNS(svgNS, "text");
+      label.setAttribute("x", mx);
+      label.setAttribute("y", my);
+      label.setAttribute("class", "relation-graph-edge-label");
+      label.setAttribute("text-anchor", "middle");
+      label.textContent = formatRelationType(e.relationType);
+      edgeLabels.push(label);
+    }
+
+    for (const node of nodes) {
+      const pos = positions.get(node.id);
+      if (!pos) continue;
+      const g = document.createElementNS(svgNS, "g");
+      g.setAttribute("class", "relation-graph-node");
+      const circle = document.createElementNS(svgNS, "circle");
+      circle.setAttribute("cx", pos.x);
+      circle.setAttribute("cy", pos.y);
+      circle.setAttribute("r", "30");
+      circle.setAttribute("class", "relation-graph-node-circle");
+      g.appendChild(circle);
+      const text = document.createElementNS(svgNS, "text");
+      text.setAttribute("x", pos.x);
+      text.setAttribute("y", pos.y + 5);
+      text.setAttribute("class", "relation-graph-node-label");
+      text.setAttribute("text-anchor", "middle");
+      const raw = node.displayName || "";
+      text.textContent = raw.length > 16 ? raw.slice(0, 14) + "…" : raw;
+      g.appendChild(text);
+      svg.appendChild(g);
+    }
+
+    for (const label of edgeLabels) {
+      svg.appendChild(label);
+    }
+
+    wrap.appendChild(svg);
+    container.appendChild(wrap);
   }
 
   function showLogin() {
@@ -207,8 +340,7 @@
     $("page-error").classList.add("hidden");
     $("page-title").textContent = "";
     $("page-meta").textContent = "";
-    $("person-list").replaceChildren();
-    $("person-list-empty").classList.add("hidden");
+    $("person-graph").replaceChildren();
 
     try {
       const res = await api("/api/relation-pages/" + pageId);
@@ -222,23 +354,14 @@
       const created = page.createdAt ? new Date(page.createdAt).toLocaleString() : "";
       $("page-meta").textContent = created ? "Created " + created : "";
 
-      const pres = await api("/api/relation-pages/" + pageId + "/persons");
-      if (!pres.ok) {
-        $("page-error").textContent = await parseError(pres);
+      const gres = await api("/api/relation-pages/" + pageId + "/persons/graph");
+      if (!gres.ok) {
+        $("page-error").textContent = await parseError(gres);
         $("page-error").classList.remove("hidden");
         return;
       }
-      const persons = await pres.json();
-      const ul = $("person-list");
-      if (!persons.length) {
-        $("person-list-empty").classList.remove("hidden");
-      } else {
-        for (const person of persons) {
-          const li = document.createElement("li");
-          li.textContent = person.displayName;
-          ul.appendChild(li);
-        }
-      }
+      const graph = await gres.json();
+      renderPersonGraph($("person-graph"), graph);
     } catch (ex) {
       $("page-error").textContent = ex.message;
       $("page-error").classList.remove("hidden");
