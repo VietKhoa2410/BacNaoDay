@@ -251,11 +251,20 @@
       edgeLabels.push(label);
     }
 
+    const markedId =
+      graph.markedPersonId != null && graph.markedPersonId !== undefined
+        ? Number(graph.markedPersonId)
+        : null;
+
     for (const node of nodes) {
       const pos = positions.get(node.id);
       if (!pos) continue;
       const g = document.createElementNS(svgNS, "g");
-      g.setAttribute("class", "relation-graph-node");
+      const isMarked = markedId != null && Number(node.id) === markedId;
+      g.setAttribute(
+        "class",
+        isMarked ? "relation-graph-node relation-graph-node--marked" : "relation-graph-node"
+      );
       const circle = document.createElementNS(svgNS, "circle");
       circle.setAttribute("cx", pos.x);
       circle.setAttribute("cy", pos.y);

@@ -49,7 +49,9 @@ public class PersonService {
 
     @Transactional(readOnly = true)
     public PersonGraphResponse graphForPage(AppUserDetails user, Long pageId) {
-        relationPageService.requireOwnedPage(user, pageId);
+        var page = relationPageService.requireOwnedPage(user, pageId);
+        Long markedPersonId =
+                page.getMarkedPerson() == null ? null : page.getMarkedPerson().getId();
         List<Person> people = personRepository.findByRelationPage_IdOrderByIdAsc(pageId);
         List<PersonGraphEdgeResponse> edges =
                 personRelationService.listForRelationPage(pageId).stream()
@@ -70,7 +72,7 @@ public class PersonService {
                             return new PersonGraphNodeResponse(p.getId(), p.getDisplayName());
                         })
                         .toList();
-        return new PersonGraphResponse(nodes, edges);
+        return new PersonGraphResponse(nodes, edges, markedPersonId);
     }
 
     @Transactional

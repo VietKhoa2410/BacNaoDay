@@ -228,7 +228,8 @@ class RelationPageOwnershipIntegrationTest {
         mockMvc.perform(get("/api/relation-pages/" + pageId + "/persons/graph").headers(bearer(alice)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nodes", hasSize(2)))
-                .andExpect(jsonPath("$.edges.length()").value(greaterThanOrEqualTo(1)));
+                .andExpect(jsonPath("$.edges.length()").value(greaterThanOrEqualTo(1)))
+                .andExpect(jsonPath("$.markedPersonId").value(nullValue()));
     }
 
     @Test
@@ -258,6 +259,10 @@ class RelationPageOwnershipIntegrationTest {
                 .andExpect(jsonPath("$.markedPersonId").value((int) personId));
 
         mockMvc.perform(get("/api/relation-pages/" + pageId).headers(bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedPersonId").value((int) personId));
+
+        mockMvc.perform(get("/api/relation-pages/" + pageId + "/persons/graph").headers(bearer(alice)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.markedPersonId").value((int) personId));
     }
