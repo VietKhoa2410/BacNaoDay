@@ -284,6 +284,19 @@ input[type="password"] {
   pointer-events: none;
 }
 
+.relation-graph-node--interactive {
+  cursor: pointer;
+}
+
+.relation-graph-node--interactive:focus {
+  outline: none;
+}
+
+.relation-graph-node--interactive:focus-visible .relation-graph-node-circle {
+  stroke-width: 4;
+  filter: brightness(1.05);
+}
+
 .relation-graph-empty {
   margin: 0;
 }

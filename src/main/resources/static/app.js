@@ -184,7 +184,36 @@
     return positions;
   }
 
-  function renderPersonGraph(container, graph) {
+  let personGraphMarkInFlight = false;
+
+  async function loadPersonGraphPage(pageId, container) {
+    const gres = await api("/api/relation-pages/" + pageId + "/persons/graph");
+    if (!gres.ok) {
+      $("page-error").textContent = await parseError(gres);
+      $("page-error").classList.remove("hidden");
+      return false;
+    }
+    $("page-error").classList.add("hidden");
+    const graph = await gres.json();
+    renderPersonGraph(container, graph, pageId);
+    return true;
+  }
+
+  async function putMarkedPerson(pageId, personId, container) {
+    const res = await api("/api/relation-pages/" + pageId + "/marked-person", {
+      method: "PUT",
+      body: JSON.stringify({ personId }),
+    });
+    if (!res.ok) {
+      $("page-error").textContent = await parseError(res);
+      $("page-error").classList.remove("hidden");
+      return;
+    }
+    $("page-error").classList.add("hidden");
+    await loadPersonGraphPage(pageId, container);
+  }
+
+  function renderPersonGraph(container, graph, pageId) {
     container.replaceChildren();
     const nodes = graph.nodes || [];
     const edges = dedupeOneEdgePerNodePair(graph.edges || []);
@@ -196,6 +225,8 @@
       return;
     }
 
+    const interactive = pageId != null && pageId !== "";
+
     const svgNS = "http://www.w3.org/2000/svg";
     const wrap = document.createElement("div");
     wrap.className = "relation-graph";
@@ -206,8 +237,12 @@
     const pad = 80;
     svg.setAttribute("viewBox", "0 0 " + w + " " + h);
     svg.setAttribute("class", "relation-graph-svg");
-    svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "People and relations on this page");
+    if (interactive) {
+      svg.setAttribute("role", "presentation");
+    } else {
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "People and relations on this page");
+    }
 
     const defs = document.createElementNS(svgNS, "defs");
     const marker = document.createElementNS(svgNS, "marker");
@@ -261,10 +296,42 @@
       if (!pos) continue;
       const g = document.createElementNS(svgNS, "g");
       const isMarked = markedId != null && Number(node.id) === markedId;
-      g.setAttribute(
-        "class",
-        isMarked ? "relation-graph-node relation-graph-node--marked" : "relation-graph-node"
-      );
+      let nodeClass =
+        isMarked
+          ? "relation-graph-node relation-graph-node--marked"
+          : "relation-graph-node";
+      if (interactive) {
+        nodeClass += " relation-graph-node--interactive";
+      }
+      g.setAttribute("class", nodeClass);
+      const display = node.displayName || "";
+      if (interactive) {
+        g.setAttribute("role", "button");
+        g.setAttribute("tabindex", "0");
+        g.setAttribute(
+          "aria-label",
+          isMarked
+            ? "Your person on this page: " + display
+            : "Mark as your person on this page: " + display
+        );
+        const triggerMark = async (ev) => {
+          if (ev.type === "keydown" && ev.key !== "Enter" && ev.key !== " ") {
+            return;
+          }
+          if (ev.type === "keydown" && ev.key === " ") {
+            ev.preventDefault();
+          }
+          if (personGraphMarkInFlight) return;
+          personGraphMarkInFlight = true;
+          try {
+            await putMarkedPerson(pageId, Number(node.id), container);
+          } finally {
+            personGraphMarkInFlight = false;
+          }
+        };
+        g.addEventListener("click", triggerMark);
+        g.addEventListener("keydown", triggerMark);
+      }
       const circle = document.createElementNS(svgNS, "circle");
       circle.setAttribute("cx", pos.x);
       circle.setAttribute("cy", pos.y);
@@ -276,7 +343,7 @@
       text.setAttribute("y", pos.y + 5);
       text.setAttribute("class", "relation-graph-node-label");
       text.setAttribute("text-anchor", "middle");
-      const raw = node.displayName || "";
+      const raw = display;
       text.textContent = raw.length > 16 ? raw.slice(0, 14) + "…" : raw;
       g.appendChild(text);
       svg.appendChild(g);
@@ -445,14 +512,7 @@
       const created = page.createdAt ? new Date(page.createdAt).toLocaleString() : "";
       $("page-meta").textContent = created ? "Created " + created : "";
 
-      const gres = await api("/api/relation-pages/" + pageId + "/persons/graph");
-      if (!gres.ok) {
-        $("page-error").textContent = await parseError(gres);
-        $("page-error").classList.remove("hidden");
-        return;
-      }
-      const graph = await gres.json();
-      renderPersonGraph($("person-graph"), graph);
+      await loadPersonGraphPage(pageId, $("person-graph"));
     } catch (ex) {
       $("page-error").textContent = ex.message;
       $("page-error").classList.remove("hidden");
