@@ -184,7 +184,45 @@
     return positions;
   }
 
-  function renderPersonGraph(container, graph) {
+  let personGraphMarkInFlight = false;
+  /** Cleans document listeners used to dismiss the per-node hover menu across re-renders. */
+  let relationGraphMenuDismiss = null;
+
+  const RELATION_NODE_MENU_HIDE_MS = 260;
+
+  async function loadPersonGraphPage(pageId, container) {
+    const gres = await api("/api/relation-pages/" + pageId + "/persons/graph");
+    if (!gres.ok) {
+      $("page-error").textContent = await parseError(gres);
+      $("page-error").classList.remove("hidden");
+      return false;
+    }
+    $("page-error").classList.add("hidden");
+    const graph = await gres.json();
+    renderPersonGraph(container, graph, pageId);
+    return true;
+  }
+
+  async function putMarkedPerson(pageId, personId, container) {
+    const res = await api("/api/relation-pages/" + pageId + "/marked-person", {
+      method: "PUT",
+      body: JSON.stringify({ personId }),
+    });
+    if (!res.ok) {
+      $("page-error").textContent = await parseError(res);
+      $("page-error").classList.remove("hidden");
+      return;
+    }
+    $("page-error").classList.add("hidden");
+    await loadPersonGraphPage(pageId, container);
+  }
+
+  function renderPersonGraph(container, graph, pageId) {
+    if (relationGraphMenuDismiss) {
+      relationGraphMenuDismiss.abort();
+      relationGraphMenuDismiss = null;
+    }
+
     container.replaceChildren();
     const nodes = graph.nodes || [];
     const edges = dedupeOneEdgePerNodePair(graph.edges || []);
@@ -196,6 +234,8 @@
       return;
     }
 
+    const interactive = pageId != null && pageId !== "";
+
     const svgNS = "http://www.w3.org/2000/svg";
     const wrap = document.createElement("div");
     wrap.className = "relation-graph";
@@ -206,8 +246,12 @@
     const pad = 80;
     svg.setAttribute("viewBox", "0 0 " + w + " " + h);
     svg.setAttribute("class", "relation-graph-svg");
-    svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "People and relations on this page");
+    if (interactive) {
+      svg.setAttribute("role", "presentation");
+    } else {
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "People and relations on this page");
+    }
 
     const defs = document.createElementNS(svgNS, "defs");
     const marker = document.createElementNS(svgNS, "marker");
@@ -256,15 +300,206 @@
         ? Number(graph.markedPersonId)
         : null;
 
+    let nodeHoverMenuUi = null;
+    if (interactive) {
+      let menuHideTimer = null;
+      let openMenuAnchor = null;
+
+      const lookupMsgEl = document.createElement("p");
+      lookupMsgEl.className = "relation-graph-lookup-msg muted small hidden";
+      lookupMsgEl.setAttribute("role", "status");
+
+      const menuEl = document.createElement("div");
+      menuEl.className = "relation-node-menu";
+      menuEl.setAttribute("role", "menu");
+      menuEl.setAttribute("aria-label", "Person actions");
+
+      const btnMarkPerson = document.createElement("button");
+      btnMarkPerson.type = "button";
+      btnMarkPerson.className = "relation-node-menu__btn";
+      btnMarkPerson.setAttribute("role", "menuitem");
+      btnMarkPerson.textContent = "Mark person";
+
+      const btnShowRelation = document.createElement("button");
+      btnShowRelation.type = "button";
+      btnShowRelation.className = "relation-node-menu__btn";
+      btnShowRelation.setAttribute("role", "menuitem");
+      btnShowRelation.textContent = "Show relation";
+
+      menuEl.append(btnMarkPerson, btnShowRelation);
+
+      function cancelScheduledMenuHide() {
+        if (menuHideTimer !== null) {
+          clearTimeout(menuHideTimer);
+          menuHideTimer = null;
+        }
+      }
+
+      function closePersonNodeMenu() {
+        cancelScheduledMenuHide();
+        menuEl.classList.remove("is-open");
+        if (openMenuAnchor) {
+          openMenuAnchor.setAttribute("aria-expanded", "false");
+        }
+        openMenuAnchor = null;
+      }
+
+      function schedulePersonNodeMenuHide() {
+        cancelScheduledMenuHide();
+        menuHideTimer = setTimeout(() => {
+          menuHideTimer = null;
+          closePersonNodeMenu();
+        }, RELATION_NODE_MENU_HIDE_MS);
+      }
+
+      function positionHoverMenu(anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        menuEl.style.left = Math.round(rect.left + rect.width / 2) + "px";
+        menuEl.style.top = Math.round(rect.bottom + 8) + "px";
+        menuEl.style.transform = "translateX(-50%)";
+      }
+
+      function openPersonNodeMenu(anchorEl, nodeId, displayLabel) {
+        cancelScheduledMenuHide();
+        if (openMenuAnchor && openMenuAnchor !== anchorEl) {
+          openMenuAnchor.setAttribute("aria-expanded", "false");
+        }
+        openMenuAnchor = anchorEl;
+        openMenuAnchor.setAttribute("aria-expanded", "true");
+        menuEl.dataset.personId = String(nodeId);
+        menuEl.dataset.personLabel = displayLabel;
+        lookupMsgEl.classList.add("hidden");
+        positionHoverMenu(anchorEl);
+        menuEl.classList.add("is-open");
+      }
+
+      menuEl.addEventListener("mouseenter", cancelScheduledMenuHide);
+      menuEl.addEventListener("mouseleave", schedulePersonNodeMenuHide);
+
+      btnMarkPerson.addEventListener("click", async () => {
+        const pid = Number(menuEl.dataset.personId, 10);
+        if (!Number.isFinite(pid)) return;
+        closePersonNodeMenu();
+        if (personGraphMarkInFlight) return;
+        personGraphMarkInFlight = true;
+        try {
+          await putMarkedPerson(pageId, pid, container);
+        } finally {
+          personGraphMarkInFlight = false;
+        }
+      });
+
+      btnShowRelation.addEventListener("click", async () => {
+        const pid = Number(menuEl.dataset.personId, 10);
+        if (!Number.isFinite(pid)) return;
+        const personLabel =
+          typeof menuEl.dataset.personLabel === "string" ? menuEl.dataset.personLabel.trim() || "Person" : "Person";
+
+        closePersonNodeMenu();
+
+        const res = await api("/api/persons/" + pid + "/relative-level");
+        if (!res.ok) {
+          $("page-error").textContent = await parseError(res);
+          $("page-error").classList.remove("hidden");
+          return;
+        }
+        $("page-error").classList.add("hidden");
+        const levelData = await res.json();
+
+        lookupMsgEl.textContent =
+          personLabel +
+          ": relative level " +
+          levelData.level +
+          " from your marked person on this page.";
+        lookupMsgEl.classList.remove("hidden");
+      });
+
+      relationGraphMenuDismiss = new AbortController();
+      const dismissSignal = relationGraphMenuDismiss.signal;
+
+      document.addEventListener(
+        "pointerdown",
+        (ev) => {
+          if (!menuEl.classList.contains("is-open")) return;
+          if (menuEl.contains(ev.target)) return;
+          if (ev.target.closest && ev.target.closest("g.relation-graph-node") === openMenuAnchor) return;
+          closePersonNodeMenu();
+        },
+        { capture: true, signal: dismissSignal }
+      );
+
+      document.addEventListener(
+        "keydown",
+        (ev) => {
+          if (ev.key !== "Escape") return;
+          if (!menuEl.classList.contains("is-open")) return;
+          ev.preventDefault();
+          const anchor = openMenuAnchor;
+          closePersonNodeMenu();
+          if (anchor && anchor.focus) anchor.focus();
+        },
+        { signal: dismissSignal }
+      );
+
+      nodeHoverMenuUi = {
+        lookupMsgEl,
+        menuEl,
+        openPersonNodeMenu,
+        closePersonNodeMenu,
+        schedulePersonNodeMenuHide,
+        cancelScheduledMenuHide,
+      };
+    }
+
     for (const node of nodes) {
       const pos = positions.get(node.id);
       if (!pos) continue;
       const g = document.createElementNS(svgNS, "g");
       const isMarked = markedId != null && Number(node.id) === markedId;
-      g.setAttribute(
-        "class",
-        isMarked ? "relation-graph-node relation-graph-node--marked" : "relation-graph-node"
-      );
+      let nodeClass =
+        isMarked
+          ? "relation-graph-node relation-graph-node--marked"
+          : "relation-graph-node";
+      if (interactive) {
+        nodeClass += " relation-graph-node--interactive";
+      }
+      g.setAttribute("class", nodeClass);
+      const display = node.displayName || "";
+      const nodeIdNum = Number(node.id);
+      if (interactive && nodeHoverMenuUi) {
+        g.setAttribute("role", "group");
+        g.setAttribute("tabindex", "0");
+        g.setAttribute("aria-expanded", "false");
+        g.setAttribute("aria-haspopup", "true");
+        g.setAttribute(
+          "aria-label",
+          (isMarked ? "Marked as your person: " : "Person: ") + display + "; open menu with hover or keyboard"
+        );
+        g.addEventListener("keydown", (ev) => {
+          if ((ev.key === "Enter" || ev.key === " ") && document.activeElement === g) {
+            ev.preventDefault();
+            nodeHoverMenuUi.openPersonNodeMenu(g, nodeIdNum, display);
+            nodeHoverMenuUi.menuEl.querySelector("button")?.focus();
+          }
+        });
+        g.addEventListener("mouseenter", () => {
+          nodeHoverMenuUi.openPersonNodeMenu(g, nodeIdNum, display);
+        });
+        g.addEventListener("mouseleave", () => {
+          nodeHoverMenuUi.schedulePersonNodeMenuHide();
+        });
+        g.addEventListener("focusin", () => {
+          nodeHoverMenuUi.openPersonNodeMenu(g, nodeIdNum, display);
+        });
+        g.addEventListener("focusout", () => {
+          setTimeout(() => {
+            if (nodeHoverMenuUi.menuEl.dataset.personId !== String(nodeIdNum)) return;
+            const ae = document.activeElement;
+            if (ae === g || nodeHoverMenuUi.menuEl.contains(ae)) return;
+            nodeHoverMenuUi.closePersonNodeMenu();
+          }, 0);
+        });
+      }
       const circle = document.createElementNS(svgNS, "circle");
       circle.setAttribute("cx", pos.x);
       circle.setAttribute("cy", pos.y);
@@ -276,7 +511,7 @@
       text.setAttribute("y", pos.y + 5);
       text.setAttribute("class", "relation-graph-node-label");
       text.setAttribute("text-anchor", "middle");
-      const raw = node.displayName || "";
+      const raw = display;
       text.textContent = raw.length > 16 ? raw.slice(0, 14) + "…" : raw;
       g.appendChild(text);
       svg.appendChild(g);
@@ -287,6 +522,10 @@
     }
 
     wrap.appendChild(svg);
+    if (nodeHoverMenuUi) {
+      wrap.appendChild(nodeHoverMenuUi.lookupMsgEl);
+      wrap.appendChild(nodeHoverMenuUi.menuEl);
+    }
     container.appendChild(wrap);
   }
 
@@ -445,14 +684,7 @@
       const created = page.createdAt ? new Date(page.createdAt).toLocaleString() : "";
       $("page-meta").textContent = created ? "Created " + created : "";
 
-      const gres = await api("/api/relation-pages/" + pageId + "/persons/graph");
-      if (!gres.ok) {
-        $("page-error").textContent = await parseError(gres);
-        $("page-error").classList.remove("hidden");
-        return;
-      }
-      const graph = await gres.json();
-      renderPersonGraph($("person-graph"), graph);
+      await loadPersonGraphPage(pageId, $("person-graph"));
     } catch (ex) {
       $("page-error").textContent = ex.message;
       $("page-error").classList.remove("hidden");

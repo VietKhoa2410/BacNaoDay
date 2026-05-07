@@ -5,35 +5,15 @@ Build a basic, maintainable web application with a clear separation of frontend,
 
 ## 2. Folder Structure
 ```text
-BacNaoDay/
-├── frontend/
-│   ├── public/
-│   │   └── favicon.ico
-│   └── src/
-│       ├── assets/
-│       ├── components/
-│       ├── pages/
-│       ├── services/
-│       ├── styles/
-│       ├── App.js
-│       └── main.js
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   ├── controllers/
-│   │   ├── repositories/
-│   │   │   ├──implements   
-│   │   ├── models/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   │   ├──implements   
-│   │   ├── app.js
-│   │   └── server.js
-│   ├── tests/
-│   └── package.json
-├── docs
-│   ├── features
-├── .env.example
+BacNaoDay
+├── api
+│   ├── payload: Request/response payload
+├── boostrap
+├── config
+├── model
+├── repository
+├── security
+├── service
 ├── .gitignore
 ├── README.md
 └── docker-compose.yml
