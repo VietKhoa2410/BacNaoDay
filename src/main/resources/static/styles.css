@@ -300,3 +300,66 @@ input[type="password"] {
 .relation-graph-empty {
   margin: 0;
 }
+
+.relation-node-menu {
+  position: fixed;
+  z-index: 50;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 10.5rem;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+}
+
+@media (prefers-color-scheme: dark) {
+  .relation-node-menu {
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  }
+}
+
+.relation-node-menu.is-open {
+  display: flex;
+}
+
+.relation-node-menu__btn {
+  font: inherit;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.relation-node-menu__btn:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.relation-node-menu__btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.relation-graph-lookup-msg {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+}
+
+.relation-graph-lookup-msg:not(.hidden) {
+  animation: relation-graph-msg-in 180ms ease-out;
+}
+
+@keyframes relation-graph-msg-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
