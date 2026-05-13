@@ -175,7 +175,7 @@ class RelationLookupIntegrationTest {
                                 .andReturn());
 
         mockMvc.perform(
-                        put("/api/relation-pages/" + pageId + "/marked-person")
+                        put("/api/relation-page/" + pageId + "/marked-person")
                                 .headers(bearer(alice))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content("{\"personId\":" + childId + "}"))

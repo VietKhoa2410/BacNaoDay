@@ -252,7 +252,7 @@ class RelationPageOwnershipIntegrationTest {
                 .andReturn();
         long personId = readPageId(personRes);
 
-        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+        mockMvc.perform(put("/api/relation-page/" + pageId + "/marked-person")
                         .headers(bearer(alice))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"personId\":" + personId + "}"))
@@ -295,7 +295,7 @@ class RelationPageOwnershipIntegrationTest {
                 .andReturn();
         long foreignPersonId = readPageId(personOnB);
 
-        mockMvc.perform(put("/api/relation-pages/" + pageA + "/marked-person")
+        mockMvc.perform(put("/api/relation-page/" + pageA + "/marked-person")
                         .headers(bearer(alice))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"personId\":" + foreignPersonId + "}"))
@@ -322,7 +322,7 @@ class RelationPageOwnershipIntegrationTest {
         long personId = readPageId(personRes);
 
         String bob = loginAs("bob", "bobpw");
-        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+        mockMvc.perform(put("/api/relation-page/" + pageId + "/marked-person")
                         .headers(bearer(bob))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"personId\":" + personId + "}"))
@@ -348,14 +348,14 @@ class RelationPageOwnershipIntegrationTest {
                 .andReturn();
         long personId = readPageId(personRes);
 
-        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+        mockMvc.perform(put("/api/relation-page/" + pageId + "/marked-person")
                         .headers(bearer(alice))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"personId\":" + personId + "}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.markedPersonId").value((int) personId));
 
-        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+        mockMvc.perform(put("/api/relation-page/" + pageId + "/marked-person")
                         .headers(bearer(alice))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"personId\":null}"))
@@ -393,7 +393,7 @@ class RelationPageOwnershipIntegrationTest {
                 .andReturn();
         long parentId = readPageId(parentRes);
 
-        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+        mockMvc.perform(put("/api/relation-page/" + pageId + "/marked-person")
                         .headers(bearer(alice))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"personId\":" + parentId + "}"))
