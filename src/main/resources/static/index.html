@@ -65,7 +65,7 @@
           <p class="muted small">
             Each person is a node in the diagram below; labeled arrows show relations on this page.
             Hover or focus a node to open Mark person (set your lookup anchor), Show relation
-            (relative level from that anchor), or Create relation (open a named relation page).
+            (relative level from that anchor), or Create relation (add a related person from that node).
           </p>
           <div id="person-graph" class="person-graph-host"></div>
         </div>
@@ -93,19 +93,33 @@
           </button>
         </div>
         <p id="create-relation-context" class="muted small">
-          Create a new named relation page from this screen.
+          Create a related person from the selected node.
         </p>
         <form id="form-create-relation" class="stack">
-          <label for="input-create-relation-name">
-            Name
+          <label for="input-create-relation-display-name">
+            Display name
             <input
-              id="input-create-relation-name"
-              name="name"
+              id="input-create-relation-display-name"
+              name="displayName"
               type="text"
               maxlength="200"
-              placeholder="New relation name"
+              placeholder="Related person's name"
               required
             />
+          </label>
+          <label for="select-create-relation-type">
+            Relation type
+            <select id="select-create-relation-type" name="relationType" required>
+              <option value="">Select relation type</option>
+              <option value="FATHER_OF">Father of</option>
+              <option value="MOTHER_OF">Mother of</option>
+              <option value="PARENT_OF">Parent of</option>
+              <option value="SON_OF">Son of</option>
+              <option value="DAUGHTER_OF">Daughter of</option>
+              <option value="CHILD_OF">Child of</option>
+              <option value="SPOUSE_OF">Spouse of</option>
+              <option value="SIBLING_OF">Sibling of</option>
+            </select>
           </label>
           <p id="create-relation-error" class="error hidden" role="alert"></p>
           <div class="dialog-actions">
