@@ -64,14 +64,61 @@
           <h2>People on this page</h2>
           <p class="muted small">
             Each person is a node in the diagram below; labeled arrows show relations on this page.
-            Hover or focus a node to open Mark person (set your lookup anchor) or Show relation
-            (relative level from that anchor).
+            Hover or focus a node to open Mark person (set your lookup anchor), Show relation
+            (relative level from that anchor), or Create relation (open a named relation page).
           </p>
           <div id="person-graph" class="person-graph-host"></div>
         </div>
         <p id="page-error" class="error hidden" role="alert"></p>
       </section>
     </main>
+
+    <div
+      id="create-relation-modal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-relation-title"
+    >
+      <div class="modal__panel">
+        <div class="modal__header">
+          <h2 id="create-relation-title">Create relation</h2>
+          <button
+            type="button"
+            id="btn-create-relation-close"
+            class="icon-btn"
+            aria-label="Close create relation dialog"
+          >
+            ×
+          </button>
+        </div>
+        <p id="create-relation-context" class="muted small">
+          Create a new named relation page from this screen.
+        </p>
+        <form id="form-create-relation" class="stack">
+          <label for="input-create-relation-name">
+            Name
+            <input
+              id="input-create-relation-name"
+              name="name"
+              type="text"
+              maxlength="200"
+              placeholder="New relation name"
+              required
+            />
+          </label>
+          <p id="create-relation-error" class="error hidden" role="alert"></p>
+          <div class="dialog-actions">
+            <button type="button" id="btn-create-relation-cancel" class="btn secondary">
+              Cancel
+            </button>
+            <button type="submit" class="btn primary">Create relation</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="app-toast" class="toast hidden" role="status" aria-live="polite"></div>
 
     <script src="/app.js" defer></script>
   </body>
