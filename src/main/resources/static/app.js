@@ -60,6 +60,7 @@
     views[name].classList.remove("hidden");
     if (name !== "page") {
       closeCreateRelationDialog();
+      closeDeleteRelationDialog();
     }
     const mainEl = document.querySelector("main.main");
     if (mainEl) mainEl.classList.toggle("main--wide", name === "page");
@@ -240,6 +241,37 @@
     });
   }
 
+  function closeDeleteRelationDialog() {
+    const modalEl = $("delete-relation-modal");
+    if (!modalEl || modalEl.classList.contains("hidden")) return;
+    modalEl.classList.add("hidden");
+    $("delete-relation-error").classList.add("hidden");
+    $("delete-relation-context").textContent = "Delete the selected person from this relation page?";
+    delete modalEl.dataset.pageId;
+    delete modalEl.dataset.personId;
+    delete modalEl.dataset.personLabel;
+  }
+
+  function openDeleteRelationDialog(pageId, personId, personLabel) {
+    const modalEl = $("delete-relation-modal");
+    if (!modalEl) return;
+    const pageIdNum = Number(pageId);
+    const personIdNum = Number(personId);
+    if (!Number.isFinite(pageIdNum) || !Number.isFinite(personIdNum)) return;
+    const trimmedLabel = typeof personLabel === "string" ? personLabel.trim() : "";
+    $("delete-relation-error").classList.add("hidden");
+    modalEl.dataset.pageId = String(pageIdNum);
+    modalEl.dataset.personId = String(personIdNum);
+    modalEl.dataset.personLabel = trimmedLabel;
+    $("delete-relation-context").textContent = trimmedLabel
+      ? 'Delete "' + trimmedLabel + '" from this relation page?'
+      : "Delete the selected person from this relation page?";
+    modalEl.classList.remove("hidden");
+    requestAnimationFrame(() => {
+      $("btn-delete-relation-cancel").focus();
+    });
+  }
+
   async function loadPersonGraphPage(pageId, container) {
     const gres = await api("/api/relation-pages/" + pageId + "/persons/graph");
     if (!gres.ok) {
@@ -382,7 +414,13 @@
       btnCreateRelation.setAttribute("role", "menuitem");
       btnCreateRelation.textContent = "Create relation";
 
-      menuEl.append(btnMarkPerson, btnShowRelation, btnCreateRelation);
+      const btnDeleteRelation = document.createElement("button");
+      btnDeleteRelation.type = "button";
+      btnDeleteRelation.className = "relation-node-menu__btn relation-node-menu__btn--danger";
+      btnDeleteRelation.setAttribute("role", "menuitem");
+      btnDeleteRelation.textContent = "Delete relation";
+
+      menuEl.append(btnMarkPerson, btnShowRelation, btnCreateRelation, btnDeleteRelation);
 
       function cancelScheduledMenuHide() {
         if (menuHideTimer !== null) {
@@ -476,6 +514,14 @@
         const toPersonId = Number(menuEl.dataset.personId, 10);
         closePersonNodeMenu();
         openCreateRelationDialog(pageId, toPersonId, personLabel);
+      });
+
+      btnDeleteRelation.addEventListener("click", () => {
+        const personLabel =
+          typeof menuEl.dataset.personLabel === "string" ? menuEl.dataset.personLabel : "";
+        const personId = Number(menuEl.dataset.personId, 10);
+        closePersonNodeMenu();
+        openDeleteRelationDialog(pageId, personId, personLabel);
       });
 
       relationGraphMenuDismiss = new AbortController();
@@ -744,11 +790,31 @@
     }
   });
 
+  $("btn-delete-relation-close").addEventListener("click", () => {
+    closeDeleteRelationDialog();
+  });
+
+  $("btn-delete-relation-cancel").addEventListener("click", () => {
+    closeDeleteRelationDialog();
+  });
+
+  $("delete-relation-modal").addEventListener("click", (ev) => {
+    if (ev.target === ev.currentTarget) {
+      closeDeleteRelationDialog();
+    }
+  });
+
   document.addEventListener("keydown", (ev) => {
     if (ev.key !== "Escape") return;
-    if ($("create-relation-modal").classList.contains("hidden")) return;
-    ev.preventDefault();
-    closeCreateRelationDialog();
+    if (!$("delete-relation-modal").classList.contains("hidden")) {
+      ev.preventDefault();
+      closeDeleteRelationDialog();
+      return;
+    }
+    if (!$("create-relation-modal").classList.contains("hidden")) {
+      ev.preventDefault();
+      closeCreateRelationDialog();
+    }
   });
 
   $("form-create-relation").addEventListener("submit", async (e) => {
@@ -791,9 +857,48 @@
     }
   });
 
+  $("form-delete-relation").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const modalEl = $("delete-relation-modal");
+    const pageId = Number(modalEl.dataset.pageId);
+    const personId = Number(modalEl.dataset.personId);
+    const personLabel =
+      typeof modalEl.dataset.personLabel === "string" ? modalEl.dataset.personLabel.trim() : "";
+    const errEl = $("delete-relation-error");
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    errEl.classList.add("hidden");
+    if (!Number.isFinite(pageId) || !Number.isFinite(personId)) {
+      errEl.textContent = "Missing selected person for this deletion.";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    submitBtn.disabled = true;
+    try {
+      const res = await api("/api/relation-page/" + pageId + "/" + personId, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        errEl.textContent = await parseError(res);
+        errEl.classList.remove("hidden");
+        return;
+      }
+      closeDeleteRelationDialog();
+      await loadPersonGraphPage(pageId, $("person-graph"));
+      showToast(
+        personLabel ? 'Deleted relation for "' + personLabel + '".' : "Deleted relation."
+      );
+    } catch (ex) {
+      errEl.textContent = ex.message;
+      errEl.classList.remove("hidden");
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
   async function openPage(pageId) {
     showView("page");
     closeCreateRelationDialog();
+    closeDeleteRelationDialog();
     $("page-error").classList.add("hidden");
     $("page-title").textContent = "";
     $("page-meta").textContent = "";

@@ -22,6 +22,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -360,5 +361,112 @@ class RelationPageOwnershipIntegrationTest {
                         .content("{\"personId\":null}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.markedPersonId").value(nullValue()));
+    }
+
+    @Test
+    void ownerCanDeletePerson_removesRelationsAndClearsMarkedPerson() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult create = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Family\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageId = readPageId(create);
+
+        MvcResult childRes = mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Child\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long childId = readPageId(childRes);
+
+        MvcResult parentRes = mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(
+                                "{\"displayName\":\"Parent\",\"toPersonId\":"
+                                        + childId
+                                        + ",\"relationType\":\"PARENT_OF\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long parentId = readPageId(parentRes);
+
+        mockMvc.perform(put("/api/relation-pages/" + pageId + "/marked-person")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"personId\":" + parentId + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedPersonId").value((int) parentId));
+
+        mockMvc.perform(delete("/api/relation-page/" + pageId + "/" + parentId).headers(bearer(alice)))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/relation-pages/" + pageId).headers(bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.markedPersonId").value(nullValue()));
+
+        mockMvc.perform(get("/api/relation-pages/" + pageId + "/persons/graph").headers(bearer(alice)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nodes", hasSize(1)))
+                .andExpect(jsonPath("$.nodes[0].id").value((int) childId))
+                .andExpect(jsonPath("$.edges", hasSize(0)))
+                .andExpect(jsonPath("$.markedPersonId").value(nullValue()));
+    }
+
+    @Test
+    void deletePerson_onOthersPage_returns404() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult create = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Alice tree\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageId = readPageId(create);
+
+        MvcResult personRes = mockMvc.perform(post("/api/relation-pages/" + pageId + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"P\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long personId = readPageId(personRes);
+
+        String bob = loginAs("bob", "bobpw");
+        mockMvc.perform(delete("/api/relation-page/" + pageId + "/" + personId).headers(bearer(bob)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void deletePerson_foreignPersonId_returns400() throws Exception {
+        String alice = loginAs("alice", "alicepw");
+        MvcResult pageARes = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"A\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageA = readPageId(pageARes);
+
+        MvcResult pageBRes = mockMvc.perform(post("/api/relation-pages")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"B\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long pageB = readPageId(pageBRes);
+
+        MvcResult personOnB = mockMvc.perform(post("/api/relation-pages/" + pageB + "/persons")
+                        .headers(bearer(alice))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"displayName\":\"Only on B\"}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        long foreignPersonId = readPageId(personOnB);
+
+        mockMvc.perform(delete("/api/relation-page/" + pageA + "/" + foreignPersonId).headers(bearer(alice)))
+                .andExpect(status().isBadRequest());
     }
 }

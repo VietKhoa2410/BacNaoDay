@@ -65,7 +65,8 @@
           <p class="muted small">
             Each person is a node in the diagram below; labeled arrows show relations on this page.
             Hover or focus a node to open Mark person (set your lookup anchor), Show relation
-            (relative level from that anchor), or Create relation (add a related person from that node).
+            (relative level from that anchor), Create relation (add a related person from that node),
+            or Delete relation (remove that person from this page).
           </p>
           <div id="person-graph" class="person-graph-host"></div>
         </div>
@@ -127,6 +128,43 @@
               Cancel
             </button>
             <button type="submit" class="btn primary">Create relation</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="delete-relation-modal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-relation-title"
+    >
+      <div class="modal__panel">
+        <div class="modal__header">
+          <h2 id="delete-relation-title">Delete relation</h2>
+          <button
+            type="button"
+            id="btn-delete-relation-close"
+            class="icon-btn"
+            aria-label="Close delete relation dialog"
+          >
+            ×
+          </button>
+        </div>
+        <p id="delete-relation-context" class="muted small">
+          Delete the selected person from this relation page?
+        </p>
+        <form id="form-delete-relation" class="stack">
+          <p class="muted small">
+            This will remove the selected person and all of their relations on this page.
+          </p>
+          <p id="delete-relation-error" class="error hidden" role="alert"></p>
+          <div class="dialog-actions">
+            <button type="button" id="btn-delete-relation-cancel" class="btn secondary">
+              Cancel
+            </button>
+            <button type="submit" class="btn danger">Delete relation</button>
           </div>
         </form>
       </div>

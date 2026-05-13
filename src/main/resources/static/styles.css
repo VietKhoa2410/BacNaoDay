@@ -151,6 +151,16 @@ select {
   border-color: var(--accent-hover);
 }
 
+.btn.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+.btn.danger:hover {
+  filter: brightness(0.95);
+}
+
 .btn.secondary {
   font-size: 0.875rem;
   padding: 0.35rem 0.65rem;
@@ -349,6 +359,14 @@ select {
 .relation-node-menu__btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+.relation-node-menu__btn--danger:hover {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.relation-node-menu__btn--danger:focus-visible {
+  outline-color: var(--danger);
 }
 
 .relation-graph-lookup-msg {

@@ -110,6 +110,26 @@ public class PersonService {
 
     }
 
+    @Transactional
+    public void delete(AppUserDetails user, Long pageId, Long personId) {
+        if (personId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "personId is required");
+        }
+        var page = relationPageService.requireOwnedPage(user, pageId);
+        if (!personRepository.existsByIdAndRelationPage_Id(personId, pageId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "personId does not belong to this relation page");
+        }
+
+        Long markedPersonId = page.getMarkedPerson() == null ? null : page.getMarkedPerson().getId();
+        if (personId.equals(markedPersonId)) {
+            page.setMarkedPerson(null);
+        }
+        page.setUpdatedAt(Instant.now());
+
+        personRelationService.deleteAllForPerson(personId);
+        personRepository.deleteById(personId);
+    }
+
     private PersonResponse toResponse(Person person, PersonRelationType relationType, String toPersonName) {
         return new PersonResponse(person.getId(), person.getDisplayName(), relationType, toPersonName);
     }
