@@ -12,4 +12,6 @@ public interface PersonRelationRepository extends JpaRepository<PersonRelation, 
             Long fromPersonId, Long toPersonId, PersonRelationType relationType);
 
     List<PersonRelation> findByFromPerson_RelationPage_IdOrderByIdAsc(Long relationPageId);
+
+    long deleteByFromPerson_IdOrToPerson_Id(Long fromPersonId, Long toPersonId);
 }

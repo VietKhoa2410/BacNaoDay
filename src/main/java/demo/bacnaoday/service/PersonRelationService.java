@@ -72,6 +72,11 @@ public class PersonRelationService {
         return personRelationRepository.findByFromPerson_RelationPage_IdOrderByIdAsc(pageId);
     }
 
+    @Transactional
+    public void deleteAllForPerson(Long personId) {
+        personRelationRepository.deleteByFromPerson_IdOrToPerson_Id(personId, personId);
+    }
+
     @Transactional(readOnly = true)
     public int computeRelativeLevel(Long pageId, Long fromPersonId, Long toPersonId) {
         if (fromPersonId.equals(toPersonId)) {
