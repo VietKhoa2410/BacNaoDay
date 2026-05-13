@@ -286,7 +286,7 @@
   }
 
   async function putMarkedPerson(pageId, personId, container) {
-    const res = await api("/api/relation-pages/" + pageId + "/marked-person", {
+    const res = await api("/api/relation-page/" + pageId + "/marked-person", {
       method: "PUT",
       body: JSON.stringify({ personId }),
     });
