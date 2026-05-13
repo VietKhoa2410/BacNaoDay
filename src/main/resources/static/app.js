@@ -58,6 +58,9 @@
   function showView(name) {
     Object.values(views).forEach((el) => el.classList.add("hidden"));
     views[name].classList.remove("hidden");
+    if (name !== "page") {
+      closeCreateRelationDialog();
+    }
     const mainEl = document.querySelector("main.main");
     if (mainEl) mainEl.classList.toggle("main--wide", name === "page");
     const loggedIn = name !== "login";
@@ -189,6 +192,53 @@
   let relationGraphMenuDismiss = null;
 
   const RELATION_NODE_MENU_HIDE_MS = 260;
+  const TOAST_HIDE_MS = 2600;
+  let toastHideTimer = null;
+
+  function showToast(message) {
+    const toastEl = $("app-toast");
+    if (!toastEl) return;
+    toastEl.textContent = message;
+    toastEl.classList.remove("hidden");
+    if (toastHideTimer !== null) {
+      clearTimeout(toastHideTimer);
+    }
+    toastHideTimer = setTimeout(() => {
+      toastEl.classList.add("hidden");
+      toastHideTimer = null;
+    }, TOAST_HIDE_MS);
+  }
+
+  function closeCreateRelationDialog() {
+    const modalEl = $("create-relation-modal");
+    if (!modalEl || modalEl.classList.contains("hidden")) return;
+    modalEl.classList.add("hidden");
+    $("form-create-relation").reset();
+    $("create-relation-error").classList.add("hidden");
+    $("create-relation-context").textContent = "Create a related person from the selected node.";
+    delete modalEl.dataset.pageId;
+    delete modalEl.dataset.toPersonId;
+  }
+
+  function openCreateRelationDialog(pageId, toPersonId, personLabel) {
+    const modalEl = $("create-relation-modal");
+    if (!modalEl) return;
+    const pageIdNum = Number(pageId);
+    const toPersonIdNum = Number(toPersonId);
+    if (!Number.isFinite(pageIdNum) || !Number.isFinite(toPersonIdNum)) return;
+    const trimmedLabel = typeof personLabel === "string" ? personLabel.trim() : "";
+    $("form-create-relation").reset();
+    $("create-relation-error").classList.add("hidden");
+    modalEl.dataset.pageId = String(pageIdNum);
+    modalEl.dataset.toPersonId = String(toPersonIdNum);
+    $("create-relation-context").textContent = trimmedLabel
+      ? 'Create a related person from "' + trimmedLabel + '".'
+      : "Create a related person from the selected node.";
+    modalEl.classList.remove("hidden");
+    requestAnimationFrame(() => {
+      $("input-create-relation-display-name").focus();
+    });
+  }
 
   async function loadPersonGraphPage(pageId, container) {
     const gres = await api("/api/relation-pages/" + pageId + "/persons/graph");
@@ -326,7 +376,13 @@
       btnShowRelation.setAttribute("role", "menuitem");
       btnShowRelation.textContent = "Show relation";
 
-      menuEl.append(btnMarkPerson, btnShowRelation);
+      const btnCreateRelation = document.createElement("button");
+      btnCreateRelation.type = "button";
+      btnCreateRelation.className = "relation-node-menu__btn";
+      btnCreateRelation.setAttribute("role", "menuitem");
+      btnCreateRelation.textContent = "Create relation";
+
+      menuEl.append(btnMarkPerson, btnShowRelation, btnCreateRelation);
 
       function cancelScheduledMenuHide() {
         if (menuHideTimer !== null) {
@@ -414,6 +470,14 @@
         lookupMsgEl.classList.remove("hidden");
       });
 
+      btnCreateRelation.addEventListener("click", () => {
+        const personLabel =
+          typeof menuEl.dataset.personLabel === "string" ? menuEl.dataset.personLabel : "";
+        const toPersonId = Number(menuEl.dataset.personId, 10);
+        closePersonNodeMenu();
+        openCreateRelationDialog(pageId, toPersonId, personLabel);
+      });
+
       relationGraphMenuDismiss = new AbortController();
       const dismissSignal = relationGraphMenuDismiss.signal;
 
@@ -471,6 +535,7 @@
         g.setAttribute("tabindex", "0");
         g.setAttribute("aria-expanded", "false");
         g.setAttribute("aria-haspopup", "true");
+        g.dataset.personId = String(nodeIdNum);
         g.setAttribute(
           "aria-label",
           (isMarked ? "Marked as your person: " : "Person: ") + display + "; open menu with hover or keyboard"
@@ -665,8 +730,70 @@
     }
   });
 
+  $("btn-create-relation-close").addEventListener("click", () => {
+    closeCreateRelationDialog();
+  });
+
+  $("btn-create-relation-cancel").addEventListener("click", () => {
+    closeCreateRelationDialog();
+  });
+
+  $("create-relation-modal").addEventListener("click", (ev) => {
+    if (ev.target === ev.currentTarget) {
+      closeCreateRelationDialog();
+    }
+  });
+
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Escape") return;
+    if ($("create-relation-modal").classList.contains("hidden")) return;
+    ev.preventDefault();
+    closeCreateRelationDialog();
+  });
+
+  $("form-create-relation").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const modalEl = $("create-relation-modal");
+    const fd = new FormData(e.target);
+    const displayName = String(fd.get("displayName") || "").trim();
+    const relationType = String(fd.get("relationType") || "").trim();
+    const pageId = Number(modalEl.dataset.pageId);
+    const toPersonId = Number(modalEl.dataset.toPersonId);
+    const errEl = $("create-relation-error");
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    errEl.classList.add("hidden");
+    if (!displayName || !relationType) return;
+    if (!Number.isFinite(pageId) || !Number.isFinite(toPersonId)) {
+      errEl.textContent = "Missing selected person for this relation.";
+      errEl.classList.remove("hidden");
+      return;
+    }
+    submitBtn.disabled = true;
+    try {
+      const res = await api("/api/relation-pages/" + pageId + "/persons", {
+        method: "POST",
+        body: JSON.stringify({ displayName, relationType, toPersonId }),
+      });
+      if (!res.ok) {
+        errEl.textContent = await parseError(res);
+        errEl.classList.remove("hidden");
+        return;
+      }
+      const createdPerson = await res.json();
+      closeCreateRelationDialog();
+      await loadPersonGraphPage(pageId, $("person-graph"));
+      showToast('Created relation for "' + (createdPerson.displayName || displayName) + '".');
+    } catch (ex) {
+      errEl.textContent = ex.message;
+      errEl.classList.remove("hidden");
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
   async function openPage(pageId) {
     showView("page");
+    closeCreateRelationDialog();
     $("page-error").classList.add("hidden");
     $("page-title").textContent = "";
     $("page-meta").textContent = "";
